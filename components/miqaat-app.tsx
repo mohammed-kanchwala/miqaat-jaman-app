@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { FAMILIES } from "@/lib/families";
-import type { AdminBookingRow, MiqaatStatusRow, MyBookingRow } from "@/lib/types";
+import type {
+  AdminBookingRow,
+  FamilyNameRow,
+  FamilyRow,
+  MiqaatStatusRow,
+  MyBookingRow,
+} from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -48,7 +53,7 @@ export default function MiqaatApp() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [claimTarget, setClaimTarget] = useState<MiqaatStatusRow | null>(null);
-  const [claimFamily, setClaimFamily] = useState(FAMILIES[0]);
+  const [claimFamily, setClaimFamily] = useState("");
   const [claimNotes, setClaimNotes] = useState("");
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -89,22 +94,30 @@ export default function MiqaatApp() {
   }
 
   // ---- My Jaman ----
-  const [myFamily, setMyFamily] = useState(FAMILIES[0]);
+  const [families, setFamilies] = useState<FamilyNameRow[]>([]);
+  const [myFamily, setMyFamily] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [verifiedFamily, setVerifiedFamily] = useState<string | null>(null);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
   const [myBookings, setMyBookings] = useState<MyBookingRow[]>([]);
   const [myLoading, setMyLoading] = useState(false);
 
-  const loadMyBookings = useCallback(async (family: string) => {
+  const loadMyBookings = useCallback(async (family: string, code: string) => {
     setMyLoading(true);
+    setBookingsError(null);
     const { data, error } = await supabase.rpc("get_my_bookings", {
       p_family_name: family,
+      p_access_code: code,
     });
-    if (!error) setMyBookings((data as MyBookingRow[]) ?? []);
+    if (error) {
+      setBookingsError(error.message);
+      setMyBookings([]);
+    } else {
+      setMyBookings((data as MyBookingRow[]) ?? []);
+      setVerifiedFamily(family);
+    }
     setMyLoading(false);
   }, []);
-
-  useEffect(() => {
-    if (tab === "my-jaman") loadMyBookings(myFamily);
-  }, [tab, myFamily, loadMyBookings]);
 
   async function handleRequestCancellation(bookingId: string) {
     const { error } = await supabase.rpc("request_cancellation", {
@@ -114,8 +127,23 @@ export default function MiqaatApp() {
       alert(error.message);
       return;
     }
-    loadMyBookings(myFamily);
+    if (verifiedFamily) loadMyBookings(verifiedFamily, accessCode);
   }
+
+  // Load family names from DB for dropdowns
+  const [claimFamilies, setClaimFamilies] = useState<FamilyNameRow[]>([]);
+
+  useEffect(() => {
+    supabase.from("family_names").select("*").then(({ data }) => {
+      if (data) {
+        const names = data as FamilyNameRow[];
+        setFamilies(names);
+        setClaimFamilies(names);
+        if (names.length > 0 && !myFamily) setMyFamily(names[0].name);
+        if (names.length > 0 && !claimFamily) setClaimFamily(names[0].name);
+      }
+    });
+  }, []);
 
   // ---- Admin ----
   const [session, setSession] = useState<Session | null>(null);
@@ -139,10 +167,6 @@ export default function MiqaatApp() {
       .order("created_at", { ascending: false });
     if (!error) setAdminBookings((data as unknown as AdminBookingRow[]) ?? []);
   }, []);
-
-  useEffect(() => {
-    if (tab === "admin" && session) loadAdminBookings();
-  }, [tab, session, loadAdminBookings]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -175,6 +199,70 @@ export default function MiqaatApp() {
     });
     if (error) return alert(error.message);
     loadAdminBookings();
+  }
+
+  // ---- Admin: Family Management ----
+  const [adminFamilies, setAdminFamilies] = useState<FamilyRow[]>([]);
+  const [newFamilyName, setNewFamilyName] = useState("");
+  const [addingFamily, setAddingFamily] = useState(false);
+  const [familyMsg, setFamilyMsg] = useState<string | null>(null);
+
+  const loadAdminFamilies = useCallback(async () => {
+    const { data, error } = await supabase.rpc("get_families");
+    if (!error) setAdminFamilies((data as FamilyRow[]) ?? []);
+  }, []);
+
+  useEffect(() => {
+    if (tab === "admin" && session) {
+      loadAdminBookings();
+      loadAdminFamilies();
+    }
+  }, [tab, session, loadAdminBookings, loadAdminFamilies]);
+
+  async function handleAddFamily(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newFamilyName.trim()) return;
+    setAddingFamily(true);
+    setFamilyMsg(null);
+    const { data, error } = await supabase.rpc("add_family", {
+      p_name: newFamilyName.trim(),
+    });
+    setAddingFamily(false);
+    if (error) {
+      setFamilyMsg(`Error: ${error.message}`);
+      return;
+    }
+    const added = (data as FamilyRow[])[0];
+    setFamilyMsg(`Added "${added.name}" — Access code: ${added.access_code}`);
+    setNewFamilyName("");
+    loadAdminFamilies();
+    // Refresh the family dropdowns
+    const { data: names } = await supabase.from("family_names").select("*");
+    if (names) {
+      setFamilies(names as FamilyNameRow[]);
+      setClaimFamilies(names as FamilyNameRow[]);
+    }
+  }
+
+  async function handleDeleteFamily(id: string) {
+    if (!confirm("Delete this family? This cannot be undone.")) return;
+    const { error } = await supabase.rpc("delete_family", { p_family_id: id });
+    if (error) return alert(error.message);
+    loadAdminFamilies();
+    const { data: names } = await supabase.from("family_names").select("*");
+    if (names) {
+      setFamilies(names as FamilyNameRow[]);
+      setClaimFamilies(names as FamilyNameRow[]);
+    }
+  }
+
+  async function handleResetCode(familyId: string) {
+    const { data, error } = await supabase.rpc("reset_access_code", {
+      p_family_id: familyId,
+    });
+    if (error) return alert(error.message);
+    setFamilyMsg(`New access code generated: ${data}`);
+    loadAdminFamilies();
   }
 
   const grouped = groupByMonth(miqaats);
@@ -279,77 +367,123 @@ export default function MiqaatApp() {
 
           {/* ---------------- MY JAMAN ---------------- */}
           <TabsContent value="my-jaman" className="space-y-4">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-slate-600">You are:</span>
-              <Select
-                className="w-56"
-                value={myFamily}
-                onChange={(e) => setMyFamily(e.target.value)}
-              >
-                {FAMILIES.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            {!verifiedFamily ? (
+              <Card>
+                <CardContent className="space-y-4 py-5">
+                  <p className="font-serif text-lg">View your family&apos;s jaman</p>
+                  <p className="text-sm text-slate-500">
+                    Select your family name and enter your access code to see your bookings.
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Family</label>
+                      <Select value={myFamily} onChange={(e) => setMyFamily(e.target.value)}>
+                        {families.length === 0 && <option value="">Loading…</option>}
+                        {families.map((f) => (
+                          <option key={f.id} value={f.name}>
+                            {f.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Access code</label>
+                      <Input
+                        type="text"
+                        placeholder="e.g. XK7M2P"
+                        value={accessCode}
+                        onChange={(e) => setAccessCode(e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      onClick={() => loadMyBookings(myFamily, accessCode)}
+                      disabled={myLoading || !myFamily || !accessCode}
+                    >
+                      {myLoading ? "Loading…" : "View my jaman"}
+                    </Button>
+                    {bookingsError && (
+                      <p className="text-sm text-red-600">{bookingsError}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-slate-600">
+                    Showing jaman for <span className="font-semibold">{verifiedFamily}</span>
+                  </p>
+                  <button
+                    onClick={() => {
+                      setVerifiedFamily(null);
+                      setAccessCode("");
+                      setMyBookings([]);
+                      setBookingsError(null);
+                    }}
+                    className="text-sm text-slate-500 underline hover:text-slate-700"
+                  >
+                    Not you? Change
+                  </button>
+                </div>
 
-            {myLoading && (
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-              </div>
+                {myLoading && (
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                  </div>
+                )}
+
+                {!myLoading && myBookings.length === 0 && (
+                  <p className="text-sm text-slate-500">
+                    No jaman claimed yet. Head to the Calendar tab to pick one.
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {myBookings.map((b) => {
+                    const canCancel = b.status === "booked" && b.days_until_miqaat >= 15;
+                    return (
+                      <Card key={b.booking_id}>
+                        <CardContent className="flex items-center justify-between gap-4 py-4">
+                          <div>
+                            <p className="font-medium">{b.name}</p>
+                            <p className="text-sm text-slate-500">
+                              {b.hijri_day} · {formatDate(b.gregorian_date)}
+                            </p>
+                            {b.status === "cancellation_requested" && (
+                              <p className="mt-1 flex items-center gap-1 text-xs text-amber-700">
+                                <Clock className="h-3 w-3" /> Cancellation requested — awaiting admin review
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            {b.status === "booked" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!canCancel}
+                                onClick={() => handleRequestCancellation(b.booking_id)}
+                                title={
+                                  !canCancel
+                                    ? "Cancellations aren't allowed within 15 days of the miqaat"
+                                    : undefined
+                                }
+                              >
+                                {canCancel
+                                  ? "Request cancellation"
+                                  : `Locked (${Math.max(b.days_until_miqaat, 0)}d left)`}
+                              </Button>
+                            )}
+                            {b.status === "cancellation_requested" && (
+                              <Badge tone="pending">Pending</Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </>
             )}
-
-            {!myLoading && myBookings.length === 0 && (
-              <p className="text-sm text-slate-500">
-                No jaman claimed yet. Head to the Calendar tab to pick one.
-              </p>
-            )}
-
-            <div className="space-y-3">
-              {myBookings.map((b) => {
-                const canCancel = b.status === "booked" && b.days_until_miqaat >= 15;
-                return (
-                  <Card key={b.booking_id}>
-                    <CardContent className="flex items-center justify-between gap-4 py-4">
-                      <div>
-                        <p className="font-medium">{b.name}</p>
-                        <p className="text-sm text-slate-500">
-                          {b.hijri_day} · {formatDate(b.gregorian_date)}
-                        </p>
-                        {b.status === "cancellation_requested" && (
-                          <p className="mt-1 flex items-center gap-1 text-xs text-amber-700">
-                            <Clock className="h-3 w-3" /> Cancellation requested — awaiting admin review
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        {b.status === "booked" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!canCancel}
-                            onClick={() => handleRequestCancellation(b.booking_id)}
-                            title={
-                              !canCancel
-                                ? "Cancellations aren't allowed within 15 days of the miqaat"
-                                : undefined
-                            }
-                          >
-                            {canCancel
-                              ? "Request cancellation"
-                              : `Locked (${Math.max(b.days_until_miqaat, 0)}d left)`}
-                          </Button>
-                        )}
-                        {b.status === "cancellation_requested" && (
-                          <Badge tone="pending">Pending</Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
           </TabsContent>
 
           {/* ---------------- ADMIN ---------------- */}
@@ -443,6 +577,63 @@ export default function MiqaatApp() {
                     )}
                   </div>
                 </div>
+
+                <div className="border-t border-slate-200 pt-6">
+                  <h3 className="mb-3 font-serif text-lg">Manage families</h3>
+
+                  {familyMsg && (
+                    <p className="mb-3 text-sm font-medium text-emerald-700">{familyMsg}</p>
+                  )}
+
+                  {/* Add family form */}
+                  <form onSubmit={handleAddFamily} className="mb-4 flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-sm font-medium">New family name</label>
+                      <Input
+                        placeholder="e.g. Abbas Bhai"
+                        value={newFamilyName}
+                        onChange={(e) => setNewFamilyName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" disabled={addingFamily}>
+                      {addingFamily ? "Adding…" : "Add family"}
+                    </Button>
+                  </form>
+
+                  {/* Family table */}
+                  <div className="space-y-2">
+                    {adminFamilies.map((f) => (
+                      <div
+                        key={f.id}
+                        className="flex items-center justify-between border-b border-slate-200 py-2 text-sm"
+                      >
+                        <span className="font-medium">{f.name}</span>
+                        <div className="flex items-center gap-3">
+                          <code className="rounded bg-slate-100 px-2 py-0.5 text-xs tracking-wider">
+                            {f.access_code}
+                          </code>
+                          <button
+                            onClick={() => handleResetCode(f.id)}
+                            className="text-xs text-slate-500 underline hover:text-slate-700"
+                            title="Reset access code"
+                          >
+                            Reset code
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFamily(f.id)}
+                            className="text-xs text-red-500 underline hover:text-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {adminFamilies.length === 0 && (
+                      <p className="text-sm text-slate-500">No families yet.</p>
+                    )}
+                  </div>
+                </div>
               </>
             )}
           </TabsContent>
@@ -464,9 +655,10 @@ export default function MiqaatApp() {
               <div>
                 <label className="mb-1 block text-sm font-medium">Family</label>
                 <Select value={claimFamily} onChange={(e) => setClaimFamily(e.target.value)}>
-                  {FAMILIES.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
+                  {claimFamilies.length === 0 && <option value="">Loading…</option>}
+                  {claimFamilies.map((f) => (
+                    <option key={f.id} value={f.name}>
+                      {f.name}
                     </option>
                   ))}
                 </Select>

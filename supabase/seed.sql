@@ -1,6 +1,19 @@
 -- =========================================================
--- Seed data: 1448H Miqaat Calendar
+-- Seed data: 1448H Miqaat Calendar & Families
 -- =========================================================
+
+-- Families — each gets a unique 6-char access code for "My Jaman" privacy.
+insert into public.family (name, access_code) values
+  ('Shk Murtaza Bhai Halai',       'XK7M2P'),
+  ('M Moayyad Bhai Jamali',        'RT4H9W'),
+  ('Muslim Bhai Halai',            'AL3F6Q'),
+  ('Dr. Saifuddin Rangwala',       'ZD8N1V'),
+  ('Mohammed Bhai Kanchwala',      'BQ5J0L'),
+  ('Juzer Bhai Balapurwala',       'GM2T7Y'),
+  ('Mustafa Bhai Panki',           'VX9K4R'),
+  ('Juzer Bhai Kachwala',          'PH1W6N'),
+  ('Yusuf Bhai Mithaiwala',        'LC8F3D'),
+  ('Sameer Bhai',                  'TJ0S5A');
 
 -- Shehre Moharramul Haram
 insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes) values

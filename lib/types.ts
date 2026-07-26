@@ -1,5 +1,16 @@
 export type BookingStatus = "booked" | "cancellation_requested" | "cancelled";
 
+export type FamilyRow = {
+  id: string;
+  name: string;
+  access_code: string;
+};
+
+export type FamilyNameRow = {
+  id: string;
+  name: string;
+};
+
 export type MiqaatStatusRow = {
   id: string;
   year: string;
