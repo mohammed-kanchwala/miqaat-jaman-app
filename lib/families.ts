@@ -2,16 +2,14 @@
 // Used to populate the "claim" and "my jaman" dropdowns so families
 // pick a name rather than free-typing one (avoids typos/duplicates).
 export const FAMILIES: string[] = [
-  "Family 1",
-  "Family 2",
-  "Family 3",
-  "Family 4",
-  "Family 5",
-  "Family 6",
-  "Family 7",
-  "Family 8",
-  "Family 9",
-  "Family 10",
-  "Family 11",
-  "Family 12",
+  "Shk Murtaza Bhai Halai",
+  "M Moayyad Bhai Jamali",
+  "Muslim Bhai Halai",
+  "Dr. Saifuddin Rangwala",
+  "Mohammed Bhai Kanchwala",
+  "Juzer Bhai Balapurwala",
+  "Mustafa Bhai Panki",
+  "Juzer Bhai Kachwala",
+  "Yusuf Bhai Mithaiwala",
+  "Sameer Bhai",
 ];
