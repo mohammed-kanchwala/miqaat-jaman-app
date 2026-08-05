@@ -54,6 +54,7 @@ export default function MiqaatApp() {
 
   const [claimTarget, setClaimTarget] = useState<MiqaatStatusRow | null>(null);
   const [claimFamily, setClaimFamily] = useState("");
+  const [claimAccessCode, setClaimAccessCode] = useState("");
   const [claimNotes, setClaimNotes] = useState("");
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -81,6 +82,7 @@ export default function MiqaatApp() {
     const { error } = await supabase.rpc("claim_miqaat", {
       p_miqaat_id: claimTarget.id,
       p_family_name: claimFamily,
+      p_access_code: claimAccessCode,
       p_notes: claimNotes || null,
     });
     setClaiming(false);
@@ -89,6 +91,7 @@ export default function MiqaatApp() {
       return;
     }
     setClaimTarget(null);
+    setClaimAccessCode("");
     setClaimNotes("");
     loadMiqaats();
   }
@@ -664,6 +667,18 @@ export default function MiqaatApp() {
                 </Select>
               </div>
               <div>
+                <label className="mb-1 block text-sm font-medium">Family access code</label>
+                <Input
+                  type="text"
+                  placeholder="e.g. XK7M2P"
+                  value={claimAccessCode}
+                  onChange={(e) => setClaimAccessCode(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Your family&apos;s code — ask the admin if you don&apos;t know it.
+                </p>
+              </div>
+              <div>
                 <label className="mb-1 block text-sm font-medium">Notes (optional)</label>
                 <Textarea
                   placeholder="Estimated headcount, dietary notes, etc."
@@ -674,7 +689,7 @@ export default function MiqaatApp() {
               {claimError && <p className="text-sm text-red-600">{claimError}</p>}
             </div>
             <DialogFooter>
-              <Button onClick={handleClaim} disabled={claiming}>
+              <Button onClick={handleClaim} disabled={claiming || !claimAccessCode}>
                 {claiming ? "Saving…" : "Confirm claim"}
               </Button>
             </DialogFooter>

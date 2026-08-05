@@ -147,10 +147,14 @@ create policy "family_admin_all"
 -- makes "self-service, no admin needed to claim" safe.
 -- ---------------------------------------------------------
 
--- Claim a miqaat. Fails cleanly if it's already taken (unique index).
+-- Claim a miqaat. Requires the family's access code so a user can only
+-- claim on behalf of their own family — the code is validated against the
+-- family table before the booking is inserted. Fails cleanly if the code
+-- doesn't match or the miqaat is already taken (unique index).
 create or replace function public.claim_miqaat(
   p_miqaat_id uuid,
   p_family_name text,
+  p_access_code text,
   p_contact text default null,
   p_headcount int default null,
   p_notes text default null
@@ -162,6 +166,13 @@ as $$
 declare
   v_booking_id uuid;
 begin
+  if not exists (
+    select 1 from public.family f
+    where f.name = p_family_name and f.access_code = p_access_code
+  ) then
+    raise exception 'Invalid family name or access code.';
+  end if;
+
   insert into public.booking (miqaat_id, family_name, contact, headcount_estimate, notes, status)
   values (p_miqaat_id, p_family_name, p_contact, p_headcount, p_notes, 'booked')
   returning id into v_booking_id;

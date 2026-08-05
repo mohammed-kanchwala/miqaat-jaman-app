@@ -17,22 +17,22 @@ insert into public.family (name, access_code) values
 
 -- Shehre Moharramul Haram
 insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes) values
-  ('1448H', 'Shehre Moharramul Haram', '2ji tarekh',  '2026-06-16', 'Tuesday',   '2ji tarekh', null, null),
-  ('1448H', 'Shehre Moharramul Haram', '3ji tarekh',  '2026-06-17', 'Wednesday', '3ji tarekh', null, null),
-  ('1448H', 'Shehre Moharramul Haram', '4thi tarekh', '2026-06-18', 'Thursday',  '4thi tarekh', null, null),
-  ('1448H', 'Shehre Moharramul Haram', '5mi tarekh',  '2026-06-19', 'Friday',    '5mi tarekh', null, null),
-  ('1448H', 'Shehre Moharramul Haram', '6thi tarekh', '2026-06-20', 'Saturday',  '6thi tarekh', null, null),
-  ('1448H', 'Shehre Moharramul Haram', '7mi tarekh',  '2026-06-21', 'Sunday',    '7mi tarekh', null, null),
-  ('1448H', 'Shehre Moharramul Haram', '8mi tarekh',  '2026-06-22', 'Monday',    'Aqa Moula TUS Niyaz', null, null),
-  ('1448H', 'Shehre Moharramul Haram', '9mi tarekh',  '2026-06-23', 'Tuesday',   '9mi tarekh', null, null),
-  ('1448H', 'Shehre Moharramul Haram', '10mi tarekh', '2026-06-24', 'Wednesday', '10mi tarekh', null, null),
+  ('1448H', 'Shehre Moharramul Haram', '2ji tarekh',  '2026-06-16', 'Tuesday',   '2ji tarekh', null, 'Maula TUS Ashara'),
+  ('1448H', 'Shehre Moharramul Haram', '3ji tarekh',  '2026-06-17', 'Wednesday', '3ji tarekh', null, 'Maula TUS Ashara'),
+  ('1448H', 'Shehre Moharramul Haram', '4thi tarekh', '2026-06-18', 'Thursday',  '4thi tarekh', null, 'Maula TUS Ashara'),
+  ('1448H', 'Shehre Moharramul Haram', '5mi tarekh',  '2026-06-19', 'Friday',    '5mi tarekh', null, 'Maula TUS Ashara'),
+  ('1448H', 'Shehre Moharramul Haram', '6thi tarekh', '2026-06-20', 'Saturday',  '6thi tarekh', null, 'Maula TUS Ashara'),
+  ('1448H', 'Shehre Moharramul Haram', '7mi tarekh',  '2026-06-21', 'Sunday',    '7mi tarekh', null, 'Maula TUS Ashara'),
+  ('1448H', 'Shehre Moharramul Haram', '8mi tarekh',  '2026-06-22', 'Monday',    'Aqa Moula TUS Niyaz', null, 'Maula TUS Ashara'),
+  ('1448H', 'Shehre Moharramul Haram', '9mi tarekh',  '2026-06-23', 'Tuesday',   '9mi tarekh', null, 'Maula TUS Ashara'),
+  ('1448H', 'Shehre Moharramul Haram', '10mi tarekh', '2026-06-24', 'Wednesday', '10mi tarekh', null, 'Maula TUS Ashara'),
   ('1448H', 'Shehre Moharramul Haram', '16mi tarekh', '2026-06-30', 'Tuesday',   '3rd al-Dai al-Mutlaq Syedna Hatim bin Syedna Ibrahim RA', 'Hutaib Mubarak', 'Moayyed Jamali'),
   ('1448H', 'Shehre Moharramul Haram', '23mi tarekh', '2026-07-07', 'Tuesday',   'Syedi Hasanfeer Shaheed AQ', 'Denmal', 'Muslim bhai Halai'),
   ('1448H', 'Shehre Moharramul Haram', '27mi tarekh', '2026-07-11', 'Saturday',  'Syedi Fakhruddin Shaheed AQ', 'Taherabad', 'No Majlis in Manchester');
 
 -- Safarul Muzaffar
 insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes) values
-  ('1448H', 'Safarul Muzaffar', '16mi tarekh', '2026-07-30', 'Thursday',  '16mi Darees', null, 'Dr. Saifuddin Rangwala'),
+  ('1448H', 'Safarul Muzaffar', '16mi tarekh', '2026-07-30', 'Thursday',  '16mi Darees', null, 'Thaali - Moayyed Jamali'),
   ('1448H', 'Safarul Muzaffar', '20mi tarekh', '2026-08-03', 'Monday',    'Chehlum Imam Husain SA', 'Karbala', 'Sh. Murtaza bhai Halai'),
   ('1448H', 'Safarul Muzaffar', '28mi tarekh', '2026-08-11', 'Tuesday',   'Shahadat Imam Hasan SA', 'Madina', null);
 
@@ -121,3 +121,14 @@ insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_
   ('1448H', 'Zilhijatil Haram', '10mi tarekh', '2027-05-15', 'Saturday', 'Eid ul Adha', null, null),
   ('1448H', 'Zilhijatil Haram', '16mi tarekh', '2027-05-22', 'Saturday', '16mi Darees', null, null),
   ('1448H', 'Zilhijatil Haram', '18mi tarekh', '2027-05-23', 'Sunday',   'Eid e Ghadeer e Khum', null, null);
+
+-- =========================================================
+-- Bookings for passed jaman (taken by the niyaz sponsor).
+-- niyaz_notes holds the sponsor's family name for these.
+-- =========================================================
+insert into public.booking (miqaat_id, family_name, notes, status, created_at)
+select m.id, m.niyaz_notes, 'Passed jaman — recorded from sponsor list', 'booked', now()
+from public.miqaat m
+where m.gregorian_date < current_date
+  and m.niyaz_notes is not null
+  and not exists (select 1 from public.booking b where b.miqaat_id = m.id);
