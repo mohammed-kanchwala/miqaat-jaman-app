@@ -21,7 +21,7 @@ export type MiqaatStatusRow = {
   name: string;
   location: string | null;
   niyaz_notes: string | null;
-  availability: "open" | "taken";
+  availability: "open" | "taken" | "no_jaman";
   booking_status: BookingStatus | null;
 };
 

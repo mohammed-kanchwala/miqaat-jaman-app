@@ -21,6 +21,7 @@ create table if not exists public.miqaat (
   name          text not null,          -- occasion name
   location      text,
   niyaz_notes   text,
+  no_jaman      boolean not null default false,  -- true = no jaman on this day
   created_at    timestamptz not null default now()
 );
 
@@ -83,7 +84,9 @@ select
   m.name,
   m.location,
   m.niyaz_notes,
-  case when b.id is null then 'open' else 'taken' end as availability,
+  case when m.no_jaman then 'no_jaman'
+       when b.id is null then 'open'
+       else 'taken' end as availability,
   b.status as booking_status  -- 'booked' or 'cancellation_requested'; null if open
 from public.miqaat m
 left join public.booking b
@@ -171,6 +174,13 @@ begin
     where f.name = p_family_name and f.access_code = p_access_code
   ) then
     raise exception 'Invalid family name or access code.';
+  end if;
+
+  if exists (
+    select 1 from public.miqaat m
+    where m.id = p_miqaat_id and m.no_jaman
+  ) then
+    raise exception 'There is no jaman on this day.';
   end if;
 
   insert into public.booking (miqaat_id, family_name, contact, headcount_estimate, notes, status)

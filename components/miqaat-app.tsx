@@ -272,6 +272,16 @@ export default function MiqaatApp() {
   const pendingCancellations = adminBookings.filter(
     (b) => b.status === "cancellation_requested"
   );
+  const takenMiqaats = miqaats.filter((m) => m.availability === "taken").length;
+  const noJamanMiqaats = miqaats.filter((m) => m.availability === "no_jaman").length;
+  const remainingMiqaats = miqaats.length - takenMiqaats - noJamanMiqaats;
+  const bookingsByFamily = adminBookings.reduce<Record<string, number>>(
+    (acc, b) => {
+      acc[b.family_name] = (acc[b.family_name] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
 
   return (
     <div className="min-h-screen bg-stone-50 text-slate-900">
@@ -322,11 +332,14 @@ export default function MiqaatApp() {
                 <div className="space-y-3">
                   {items.map((m) => {
                     const isOpen = m.availability === "open";
+                    const isNoJaman = m.availability === "no_jaman";
                     return (
                       <Card key={m.id}>
                         <CardContent className="flex items-start justify-between gap-4 py-4">
                           <div className="flex items-start gap-3">
-                            {isOpen ? (
+                            {isNoJaman ? (
+                              <MoonStar className="mt-0.5 h-5 w-5 text-slate-400" />
+                            ) : isOpen ? (
                               <Moon className="mt-0.5 h-5 w-5 text-amber-500" />
                             ) : (
                               <MoonStar className="mt-0.5 h-5 w-5 text-slate-400" />
@@ -344,7 +357,9 @@ export default function MiqaatApp() {
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2">
-                            {isOpen ? (
+                            {isNoJaman ? (
+                              <Badge tone="neutral">No Jaman</Badge>
+                            ) : isOpen ? (
                               <Badge tone="open">Open</Badge>
                             ) : (
                               <Badge tone="taken">
@@ -531,6 +546,57 @@ export default function MiqaatApp() {
                   </CardContent>
                 </Card>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <Card className="border-slate-200 bg-white">
+                    <CardContent className="py-4 text-center">
+                      <p className="text-2xl font-bold">{miqaats.length}</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Total miqaats
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-emerald-200 bg-emerald-50">
+                    <CardContent className="py-4 text-center">
+                      <p className="text-2xl font-bold text-emerald-700">{takenMiqaats}</p>
+                      <p className="text-xs uppercase tracking-wide text-emerald-700">
+                        Taken
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-sky-200 bg-sky-50">
+                    <CardContent className="py-4 text-center">
+                      <p className="text-2xl font-bold text-sky-700">{remainingMiqaats}</p>
+                      <p className="text-xs uppercase tracking-wide text-sky-700">
+                        Remaining
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-slate-200 bg-slate-50">
+                    <CardContent className="py-4 text-center">
+                      <p className="text-2xl font-bold text-slate-600">{noJamanMiqaats}</p>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        No Jaman
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div>
+                  <h3 className="mb-3 font-serif text-lg">Bookings by family</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {adminFamilies.map((f) => (
+                      <Card key={f.id} className="border-slate-200">
+                        <CardContent className="flex items-center justify-between py-4">
+                          <span className="font-medium">{f.name}</span>
+                          <Badge tone={bookingsByFamily[f.name] ? "taken" : "neutral"}>
+                            {bookingsByFamily[f.name] ?? 0} jaman
+                          </Badge>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
                 {pendingCancellations.length > 0 && (
                   <div>
                     <h3 className="mb-3 font-serif text-lg">Pending cancellation requests</h3>
@@ -564,6 +630,9 @@ export default function MiqaatApp() {
                   <div className="space-y-2">
                     {adminBookings
                       .filter((b) => b.status !== "cancelled")
+                      .sort((a, b) =>
+                        a.miqaat.gregorian_date.localeCompare(b.miqaat.gregorian_date)
+                      )
                       .map((b) => (
                         <div
                           key={b.id}

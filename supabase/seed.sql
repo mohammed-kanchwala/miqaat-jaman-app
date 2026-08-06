@@ -31,10 +31,10 @@ insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_
   ('1448H', 'Shehre Moharramul Haram', '27mi tarekh', '2026-07-11', 'Saturday',  'Syedi Fakhruddin Shaheed AQ', 'Taherabad', 'No Majlis in Manchester');
 
 -- Safarul Muzaffar
-insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes) values
-  ('1448H', 'Safarul Muzaffar', '16mi tarekh', '2026-07-30', 'Thursday',  '16mi Darees', null, 'Thaali - Moayyed Jamali'),
-  ('1448H', 'Safarul Muzaffar', '20mi tarekh', '2026-08-03', 'Monday',    'Chehlum Imam Husain SA', 'Karbala', 'Sh. Murtaza bhai Halai'),
-  ('1448H', 'Safarul Muzaffar', '28mi tarekh', '2026-08-11', 'Tuesday',   'Shahadat Imam Hasan SA', 'Madina', null);
+insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes, no_jaman) values
+  ('1448H', 'Safarul Muzaffar', '16mi tarekh', '2026-07-30', 'Thursday',  '16mi Darees', null, null, true),
+  ('1448H', 'Safarul Muzaffar', '20mi tarekh', '2026-08-03', 'Monday',    'Chehlum Imam Husain SA', 'Karbala', 'Sh. Murtaza bhai Halai', false),
+  ('1448H', 'Safarul Muzaffar', '28mi tarekh', '2026-08-11', 'Tuesday',   'Shahadat Imam Hasan SA', 'Madina', null, false);
 
 -- Rabiul Awwal
 insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes) values
