@@ -73,37 +73,40 @@ insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_
   ('1448H', 'Shabanul Karim', '22mi tarekh', '2027-01-29', 'Friday',   'Maulatena Hurratul Maleka RA', 'Zi Jibla', null);
 
 -- Shehre Ramzanul Moazzam
-insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes) values
-  ('1448H', 'Shehre Ramzanul Moazzam', '1li tarekh',  '2027-02-06', 'Saturday',  '1li tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '2ji tarekh',  '2027-02-07', 'Sunday',    '2ji tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '3ji tarekh',  '2027-02-08', 'Monday',    '3ji tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '4thi tarekh', '2027-02-09', 'Tuesday',   '4thi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '5mi tarekh',  '2027-02-10', 'Wednesday', '5mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '6thi tarekh', '2027-02-11', 'Thursday',  '6thi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '7mi tarekh',  '2027-02-12', 'Friday',    '7mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '8mi tarekh',  '2027-02-13', 'Saturday',  '8mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '9mi tarekh',  '2027-02-14', 'Sunday',    '9mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '10mi tarekh', '2027-02-15', 'Monday',    '10mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '11mi tarekh', '2027-02-16', 'Tuesday',   '11mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '12mi tarekh', '2027-02-17', 'Wednesday', '12mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '13mi tarekh', '2027-02-18', 'Thursday',  '13mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '14mi tarekh', '2027-02-19', 'Friday',    '14mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '15mi tarekh', '2027-02-20', 'Saturday',  '15mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '16mi tarekh', '2027-02-21', 'Sunday',    '16mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '17mi tarekh', '2027-02-22', 'Monday',    '17mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '18mi tarekh', '2027-02-23', 'Tuesday',   '18mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '19mi tarekh', '2027-02-24', 'Wednesday', 'Aqa Moula TUS Niyaz', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '20mi tarekh', '2027-02-25', 'Thursday',  '20mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '21mi tarekh', '2027-02-26', 'Friday',    '21mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '22mi tarekh', '2027-02-27', 'Saturday',  'Majmui Niyaz', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '23mi tarekh', '2027-02-28', 'Sunday',    '23mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '24mi tarekh', '2027-03-01', 'Monday',    '24mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '25mi tarekh', '2027-03-02', 'Tuesday',   '25mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '26mi tarekh', '2027-03-03', 'Wednesday', '26mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '27mi tarekh', '2027-03-04', 'Thursday',  '27mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '28mi tarekh', '2027-03-05', 'Friday',    '28mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '29mi tarekh', '2027-03-06', 'Saturday',  '29mi tarekh', null, null),
-  ('1448H', 'Shehre Ramzanul Moazzam', '30mi tarekh', '2027-03-07', 'Sunday',    '30mi tarekh', null, null);
+-- Note: 19mi (Aqa Moula TUS Niyaz) and 22mi (Majmui Niyaz) are community
+-- niyaz days — jaman is done by the whole community, so they're visible but
+-- not claimable by a family (community_niyaz).
+insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes, community_niyaz) values
+  ('1448H', 'Shehre Ramzanul Moazzam', '1li tarekh',  '2027-02-06', 'Saturday',  '1li tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '2ji tarekh',  '2027-02-07', 'Sunday',    '2ji tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '3ji tarekh',  '2027-02-08', 'Monday',    '3ji tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '4thi tarekh', '2027-02-09', 'Tuesday',   '4thi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '5mi tarekh',  '2027-02-10', 'Wednesday', '5mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '6thi tarekh', '2027-02-11', 'Thursday',  '6thi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '7mi tarekh',  '2027-02-12', 'Friday',    '7mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '8mi tarekh',  '2027-02-13', 'Saturday',  '8mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '9mi tarekh',  '2027-02-14', 'Sunday',    '9mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '10mi tarekh', '2027-02-15', 'Monday',    '10mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '11mi tarekh', '2027-02-16', 'Tuesday',   '11mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '12mi tarekh', '2027-02-17', 'Wednesday', '12mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '13mi tarekh', '2027-02-18', 'Thursday',  '13mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '14mi tarekh', '2027-02-19', 'Friday',    '14mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '15mi tarekh', '2027-02-20', 'Saturday',  '15mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '16mi tarekh', '2027-02-21', 'Sunday',    '16mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '17mi tarekh', '2027-02-22', 'Monday',    '17mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '18mi tarekh', '2027-02-23', 'Tuesday',   '18mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '19mi tarekh', '2027-02-24', 'Wednesday', 'Aqa Moula TUS Niyaz', null, null, true),
+  ('1448H', 'Shehre Ramzanul Moazzam', '20mi tarekh', '2027-02-25', 'Thursday',  '20mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '21mi tarekh', '2027-02-26', 'Friday',    '21mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '22mi tarekh', '2027-02-27', 'Saturday',  'Majmui Niyaz', null, null, true),
+  ('1448H', 'Shehre Ramzanul Moazzam', '23mi tarekh', '2027-02-28', 'Sunday',    '23mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '24mi tarekh', '2027-03-01', 'Monday',    '24mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '25mi tarekh', '2027-03-02', 'Tuesday',   '25mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '26mi tarekh', '2027-03-03', 'Wednesday', '26mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '27mi tarekh', '2027-03-04', 'Thursday',  '27mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '28mi tarekh', '2027-03-05', 'Friday',    '28mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '29mi tarekh', '2027-03-06', 'Saturday',  '29mi tarekh', null, null, false),
+  ('1448H', 'Shehre Ramzanul Moazzam', '30mi tarekh', '2027-03-07', 'Sunday',    '30mi tarekh', null, null, false);
 
 -- Shawwalul Mukarram
 insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes) values

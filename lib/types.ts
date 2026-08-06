@@ -21,8 +21,13 @@ export type MiqaatStatusRow = {
   name: string;
   location: string | null;
   niyaz_notes: string | null;
-  availability: "open" | "taken" | "no_jaman";
+  availability: "open" | "taken" | "no_jaman" | "community_niyaz";
   booking_status: BookingStatus | null;
+};
+
+/** miqaat_status_admin — same as MiqaatStatusRow, plus the sponsor's family name (admin-only). */
+export type MiqaatStatusAdminRow = MiqaatStatusRow & {
+  family_name: string | null;
 };
 
 export type MyBookingRow = {

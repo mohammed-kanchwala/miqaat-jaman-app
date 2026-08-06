@@ -22,6 +22,7 @@ create table if not exists public.miqaat (
   location      text,
   niyaz_notes   text,
   no_jaman      boolean not null default false,  -- true = no jaman on this day
+  community_niyaz boolean not null default false, -- true = jaman by the whole community; not claimable by a family
   created_at    timestamptz not null default now()
 );
 
@@ -85,9 +86,33 @@ select
   m.location,
   m.niyaz_notes,
   case when m.no_jaman then 'no_jaman'
+       when m.community_niyaz then 'community_niyaz'
        when b.id is null then 'open'
        else 'taken' end as availability,
   b.status as booking_status  -- 'booked' or 'cancellation_requested'; null if open
+from public.miqaat m
+left join public.booking b
+  on b.miqaat_id = m.id and b.status <> 'cancelled';
+
+-- Admin-only view — same as miqaat_status plus the sponsor family name.
+-- Only granted to the authenticated role, so anonymous visitors never see it.
+create or replace view public.miqaat_status_admin as
+select
+  m.id,
+  m.year,
+  m.hijri_month,
+  m.hijri_day,
+  m.gregorian_date,
+  m.day_of_week,
+  m.name,
+  m.location,
+  m.niyaz_notes,
+  case when m.no_jaman then 'no_jaman'
+       when m.community_niyaz then 'community_niyaz'
+       when b.id is null then 'open'
+       else 'taken' end as availability,
+  b.status as booking_status,  -- 'booked' or 'cancellation_requested'; null if open
+  b.family_name                -- null if open / no jaman / community niyaz
 from public.miqaat m
 left join public.booking b
   on b.miqaat_id = m.id and b.status <> 'cancelled';
@@ -178,9 +203,9 @@ begin
 
   if exists (
     select 1 from public.miqaat m
-    where m.id = p_miqaat_id and m.no_jaman
+    where m.id = p_miqaat_id and (m.no_jaman or m.community_niyaz)
   ) then
-    raise exception 'There is no jaman on this day.';
+    raise exception 'This miqaat is not claimable.';
   end if;
 
   insert into public.booking (miqaat_id, family_name, contact, headcount_estimate, notes, status)
@@ -408,12 +433,114 @@ begin
 end;
 $$;
 
+-- Add a new miqaat (admin only). Duplicate dates are blocked.
+create or replace function public.add_miqaat(
+  p_hijri_month text,
+  p_hijri_day text,
+  p_gregorian_date date,
+  p_name text,
+  p_location text default null,
+  p_niyaz_notes text default null,
+  p_community_niyaz boolean default false
+) returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+begin
+  if auth.role() <> 'authenticated' then
+    raise exception 'Not authorized.';
+  end if;
+
+  if exists (
+    select 1 from public.miqaat m where m.gregorian_date = p_gregorian_date
+  ) then
+    raise exception 'A miqaat already exists on this date.' using errcode = '23505';
+  end if;
+
+  insert into public.miqaat (year, hijri_month, hijri_day, gregorian_date, day_of_week, name, location, niyaz_notes, community_niyaz)
+  values (
+    '1448H',
+    p_hijri_month,
+    p_hijri_day,
+    p_gregorian_date,
+    to_char(p_gregorian_date, 'Day'),
+    p_name,
+    p_location,
+    p_niyaz_notes,
+    p_community_niyaz
+  )
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+-- Delete a miqaat (admin only). Cascades to its bookings.
+create or replace function public.delete_miqaat(p_miqaat_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() <> 'authenticated' then
+    raise exception 'Not authorized.';
+  end if;
+  delete from public.miqaat where id = p_miqaat_id;
+end;
+$$;
+
+-- Update a miqaat (admin only). Duplicate dates (other than itself) are blocked.
+create or replace function public.update_miqaat(
+  p_miqaat_id uuid,
+  p_hijri_month text,
+  p_hijri_day text,
+  p_gregorian_date date,
+  p_name text,
+  p_location text default null,
+  p_niyaz_notes text default null,
+  p_community_niyaz boolean default false
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() <> 'authenticated' then
+    raise exception 'Not authorized.';
+  end if;
+
+  if exists (
+    select 1 from public.miqaat m
+    where m.gregorian_date = p_gregorian_date
+      and m.id <> p_miqaat_id
+  ) then
+    raise exception 'A miqaat already exists on this date.' using errcode = '23505';
+  end if;
+
+  update public.miqaat
+    set hijri_month   = p_hijri_month,
+        hijri_day     = p_hijri_day,
+        gregorian_date = p_gregorian_date,
+        day_of_week   = to_char(p_gregorian_date, 'Day'),
+        name          = p_name,
+        location      = p_location,
+        niyaz_notes   = p_niyaz_notes,
+        community_niyaz = p_community_niyaz
+  where id = p_miqaat_id;
+end;
+$$;
+
 -- ---------------------------------------------------------
 -- Grants
 -- ---------------------------------------------------------
 
 grant select on public.miqaat to anon, authenticated;
 grant select on public.miqaat_status to anon, authenticated;
+grant select on public.miqaat_status_admin to authenticated;
 grant select on public.family_names to anon, authenticated;
 grant execute on function public.claim_miqaat to anon, authenticated;
 grant execute on function public.get_my_bookings to anon, authenticated;
@@ -424,5 +551,8 @@ grant execute on function public.get_families to authenticated;
 grant execute on function public.add_family to authenticated;
 grant execute on function public.delete_family to authenticated;
 grant execute on function public.reset_access_code to authenticated;
+grant execute on function public.add_miqaat to authenticated;
+grant execute on function public.delete_miqaat to authenticated;
+grant execute on function public.update_miqaat to authenticated;
 -- Note: no grants on public.booking or public.family directly for anon — access
 -- is only through RPCs, the miqaat_status view, and the family_names view.

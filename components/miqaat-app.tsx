@@ -7,6 +7,7 @@ import type {
   AdminBookingRow,
   FamilyNameRow,
   FamilyRow,
+  MiqaatStatusAdminRow,
   MiqaatStatusRow,
   MyBookingRow,
 } from "@/lib/types";
@@ -25,7 +26,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MoonStrip } from "@/components/moon-strip";
-import { Moon, MoonStar, MapPin, Clock, Check, X, ShieldCheck, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Moon, MoonStar, MapPin, Clock, Check, X, ShieldCheck, Loader2, CalendarPlus, Trash2, Pencil } from "lucide-react";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -34,6 +36,21 @@ function formatDate(dateStr: string) {
     year: "numeric",
   });
 }
+
+const HIJRI_MONTHS = [
+  "Shehre Moharramul Haram",
+  "Safarul Muzaffar",
+  "Rabiul Awwal",
+  "Rabiul Akhar",
+  "Jamadal Ula",
+  "Jamadal Ukhra",
+  "Shehre Rajabul Asab",
+  "Shabanul Karim",
+  "Shehre Ramzanul Moazzam",
+  "Shawwalul Mukarram",
+  "Zilqadatil Haram",
+  "Zilhijatil Haram",
+];
 
 function groupByMonth<T extends { hijri_month: string }>(list: T[]) {
   const groups: Record<string, T[]> = {};
@@ -46,9 +63,14 @@ function groupByMonth<T extends { hijri_month: string }>(list: T[]) {
 
 export default function MiqaatApp() {
   const [tab, setTab] = useState<"calendar" | "my-jaman" | "admin">("calendar");
+  const [calendarFilter, setCalendarFilter] = useState<
+    "all" | "open" | "taken" | "no_jaman" | "community_niyaz"
+  >("all");
+  const [calendarFamily, setCalendarFamily] = useState<string | null>(null);
 
   // ---- Calendar ----
   const [miqaats, setMiqaats] = useState<MiqaatStatusRow[]>([]);
+  const [adminMiqaats, setAdminMiqaats] = useState<MiqaatStatusAdminRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -162,6 +184,22 @@ export default function MiqaatApp() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Load the admin-only miqaat list (with sponsor names) while signed in,
+  // and drop it as soon as the admin signs out.
+  useEffect(() => {
+    if (!session) {
+      setAdminMiqaats([]);
+      return;
+    }
+    supabase
+      .from("miqaat_status_admin")
+      .select("*")
+      .order("gregorian_date")
+      .then(({ data, error }) => {
+        if (!error) setAdminMiqaats((data as MiqaatStatusAdminRow[]) ?? []);
+      });
+  }, [session]);
+
   const loadAdminBookings = useCallback(async () => {
     const { data, error } = await supabase
       .from("booking")
@@ -268,13 +306,118 @@ export default function MiqaatApp() {
     loadAdminFamilies();
   }
 
-  const grouped = groupByMonth(miqaats);
+  // ---- Admin: Miqaat add/edit (shared dialog) ----
+  const [miqaatDialogOpen, setMiqaatDialogOpen] = useState(false);
+  const [editingMiqaat, setEditingMiqaat] = useState<MiqaatStatusRow | null>(null);
+  const [miqaatMonth, setMiqaatMonth] = useState(HIJRI_MONTHS[0]);
+  const [miqaatDay, setMiqaatDay] = useState("");
+  const [miqaatDate, setMiqaatDate] = useState("");
+  const [miqaatName, setMiqaatName] = useState("");
+  const [miqaatLocation, setMiqaatLocation] = useState("");
+  const [miqaatNotes, setMiqaatNotes] = useState("");
+  const [miqaatCommunityNiyaz, setMiqaatCommunityNiyaz] = useState(false);
+  const [savingMiqaat, setSavingMiqaat] = useState(false);
+  const [miqaatError, setMiqaatError] = useState<string | null>(null);
+  const [miqaatMsg, setMiqaatMsg] = useState<string | null>(null);
+
+  function openAddMiqaatDialog() {
+    setEditingMiqaat(null);
+    setMiqaatMonth(HIJRI_MONTHS[0]);
+    setMiqaatDay("");
+    setMiqaatDate("");
+    setMiqaatName("");
+    setMiqaatLocation("");
+    setMiqaatNotes("");
+    setMiqaatCommunityNiyaz(false);
+    setMiqaatError(null);
+    setMiqaatDialogOpen(true);
+  }
+
+  function openEditMiqaatDialog(miqaat: MiqaatStatusRow) {
+    setEditingMiqaat(miqaat);
+    setMiqaatMonth(miqaat.hijri_month);
+    setMiqaatDay(miqaat.hijri_day);
+    setMiqaatDate(miqaat.gregorian_date);
+    setMiqaatName(miqaat.name);
+    setMiqaatLocation(miqaat.location ?? "");
+    setMiqaatNotes(miqaat.niyaz_notes ?? "");
+    setMiqaatCommunityNiyaz(miqaat.availability === "community_niyaz");
+    setMiqaatError(null);
+    setMiqaatDialogOpen(true);
+  }
+
+  async function handleSaveMiqaat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!miqaatDay.trim() || !miqaatDate || !miqaatName.trim()) return;
+    setSavingMiqaat(true);
+    setMiqaatError(null);
+    const payload = {
+      p_hijri_month: miqaatMonth,
+      p_hijri_day: miqaatDay.trim(),
+      p_gregorian_date: miqaatDate,
+      p_name: miqaatName.trim(),
+      p_location: miqaatLocation.trim() || null,
+      p_niyaz_notes: miqaatNotes.trim() || null,
+      p_community_niyaz: miqaatCommunityNiyaz,
+    };
+    const { error } = editingMiqaat
+      ? await supabase.rpc("update_miqaat", { p_miqaat_id: editingMiqaat.id, ...payload })
+      : await supabase.rpc("add_miqaat", payload);
+    setSavingMiqaat(false);
+    if (error) {
+      setMiqaatError(error.message);
+      return;
+    }
+    setMiqaatMsg(
+      editingMiqaat
+        ? `Updated "${miqaatName.trim()}".`
+        : `Added "${miqaatName.trim()}" — families can now claim it.`
+    );
+    setMiqaatDialogOpen(false);
+    setEditingMiqaat(null);
+    loadMiqaats();
+  }
+
+  async function handleDeleteMiqaat(miqaat: MiqaatStatusRow) {
+    if (
+      !confirm(
+        `Delete "${miqaat.name}" (${miqaat.hijri_day})? This removes the miqaat and its bookings permanently.`
+      )
+    )
+      return;
+    const { error } = await supabase.rpc("delete_miqaat", {
+      p_miqaat_id: miqaat.id,
+    });
+    if (error) return alert(error.message);
+    setMiqaatMsg(`Deleted "${miqaat.name}".`);
+    loadMiqaats();
+  }
+
+  const visibleMiqaats =
+    calendarFilter === "all"
+      ? miqaats
+      : miqaats.filter((m) => m.availability === calendarFilter);
+
+  // Family filter (admin-only, via adminMiqaats) applies on top of the status filter.
+  const familyFiltered =
+    calendarFamily && session
+      ? visibleMiqaats.filter(
+          (m) =>
+            adminMiqaats.find((am) => am.id === m.id)?.family_name === calendarFamily
+        )
+      : visibleMiqaats;
+  const grouped = groupByMonth(familyFiltered);
   const pendingCancellations = adminBookings.filter(
     (b) => b.status === "cancellation_requested"
   );
   const takenMiqaats = miqaats.filter((m) => m.availability === "taken").length;
   const noJamanMiqaats = miqaats.filter((m) => m.availability === "no_jaman").length;
-  const remainingMiqaats = miqaats.length - takenMiqaats - noJamanMiqaats;
+  const communityNiyazMiqaats = miqaats.filter(
+    (m) => m.availability === "community_niyaz"
+  ).length;
+  // Community niyaz and no-jaman days are not claimable, so they're not "remaining".
+  const remainingMiqaats =
+    miqaats.length - takenMiqaats - noJamanMiqaats - communityNiyazMiqaats;
   const bookingsByFamily = adminBookings.reduce<Record<string, number>>(
     (acc, b) => {
       acc[b.family_name] = (acc[b.family_name] ?? 0) + 1;
@@ -326,6 +469,63 @@ export default function MiqaatApp() {
                 No miqaats yet — the admin needs to import this year&apos;s list.
               </p>
             )}
+            {!loading && !loadError && miqaats.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs uppercase tracking-wide text-slate-500">Filter</span>
+                  {(
+                    [
+                      ["all", "All", miqaats.length],
+                      ["taken", "Taken", takenMiqaats],
+                      ["open", "Remaining", remainingMiqaats],
+                      ["community_niyaz", "Community", communityNiyazMiqaats],
+                      ["no_jaman", "No Jaman", noJamanMiqaats],
+                    ] as const
+                  ).map(([value, label, count]) => (
+                    <button
+                      key={value}
+                      onClick={() => setCalendarFilter(value)}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                        calendarFilter === value
+                          ? "border-slate-900 bg-slate-900 text-stone-50"
+                          : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800"
+                      )}
+                    >
+                      {label} · {count}
+                    </button>
+                  ))}
+                </div>
+                {session && (
+                  <Button size="sm" onClick={openAddMiqaatDialog}>
+                    <CalendarPlus className="mr-1 h-4 w-4" /> Add miqaat
+                  </Button>
+                )}
+              </div>
+            )}
+            {!loading &&
+              !loadError &&
+              familyFiltered.length === 0 &&
+              (calendarFilter !== "all" || (calendarFamily && session)) && (
+                <p className="text-sm text-slate-500">
+                  No {calendarFilter === "all" ? "" : `${calendarFilter} `}miqaats
+                  {calendarFamily && session ? ` for ${calendarFamily}` : ""} found.
+                </p>
+              )}
+            {!loading && !loadError && calendarFamily && session && (
+              <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <span>
+                  Showing jaman for <span className="font-semibold">{calendarFamily}</span>
+                  {familyFiltered.length > 0 ? ` — ${familyFiltered.length} total` : ""}.
+                </span>
+                <button
+                  onClick={() => setCalendarFamily(null)}
+                  className="font-medium underline hover:text-amber-900"
+                >
+                  Show all
+                </button>
+              </div>
+            )}
             {Object.entries(grouped).map(([month, items]) => (
               <div key={month}>
                 <h2 className="mb-3 font-serif text-lg text-slate-700">{month}</h2>
@@ -333,11 +533,15 @@ export default function MiqaatApp() {
                   {items.map((m) => {
                     const isOpen = m.availability === "open";
                     const isNoJaman = m.availability === "no_jaman";
+                    const isCommunityNiyaz = m.availability === "community_niyaz";
+                    const familyName = adminMiqaats.find(
+                      (am) => am.id === m.id
+                    )?.family_name;
                     return (
                       <Card key={m.id}>
                         <CardContent className="flex items-start justify-between gap-4 py-4">
                           <div className="flex items-start gap-3">
-                            {isNoJaman ? (
+                            {isNoJaman || isCommunityNiyaz ? (
                               <MoonStar className="mt-0.5 h-5 w-5 text-slate-400" />
                             ) : isOpen ? (
                               <Moon className="mt-0.5 h-5 w-5 text-amber-500" />
@@ -349,6 +553,12 @@ export default function MiqaatApp() {
                               <p className="text-sm text-slate-500">
                                 {m.hijri_day} · {formatDate(m.gregorian_date)} · {m.day_of_week}
                               </p>
+                              {familyName && (
+                                <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-900">
+                                  <Moon className="h-3.5 w-3.5 text-amber-500" />
+                                  Sponsored by {familyName}
+                                </p>
+                              )}
                               {m.location && (
                                 <p className="mt-0.5 flex items-center gap-1 text-sm text-slate-500">
                                   <MapPin className="h-3.5 w-3.5" /> {m.location}
@@ -357,7 +567,13 @@ export default function MiqaatApp() {
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2">
-                            {isNoJaman ? (
+                            {isCommunityNiyaz ? (
+                              // Community niyaz: jaman is done by everyone, not claimed by a family.
+                              // Public visitors see no badge; admins see a subtle note.
+                              session ? (
+                                <Badge tone="pending">Community niyaz</Badge>
+                              ) : null
+                            ) : isNoJaman ? (
                               <Badge tone="neutral">No Jaman</Badge>
                             ) : isOpen ? (
                               <Badge tone="open">Open</Badge>
@@ -372,6 +588,22 @@ export default function MiqaatApp() {
                               <Button size="sm" onClick={() => setClaimTarget(m)}>
                                 Claim jaman
                               </Button>
+                            )}
+                            {session && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <button
+                                  onClick={() => openEditMiqaatDialog(m)}
+                                  className="flex items-center gap-1 text-slate-500 underline hover:text-slate-700"
+                                >
+                                  <Pencil className="h-3 w-3" /> Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteMiqaat(m)}
+                                  className="flex items-center gap-1 text-red-500 underline hover:text-red-700"
+                                >
+                                  <Trash2 className="h-3 w-3" /> Delete
+                                </button>
+                              </div>
                             )}
                           </div>
                         </CardContent>
@@ -546,53 +778,130 @@ export default function MiqaatApp() {
                   </CardContent>
                 </Card>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <Card className="border-slate-200 bg-white">
-                    <CardContent className="py-4 text-center">
-                      <p className="text-2xl font-bold">{miqaats.length}</p>
-                      <p className="text-xs uppercase tracking-wide text-slate-500">
-                        Total miqaats
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-emerald-200 bg-emerald-50">
-                    <CardContent className="py-4 text-center">
-                      <p className="text-2xl font-bold text-emerald-700">{takenMiqaats}</p>
-                      <p className="text-xs uppercase tracking-wide text-emerald-700">
-                        Taken
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-sky-200 bg-sky-50">
-                    <CardContent className="py-4 text-center">
-                      <p className="text-2xl font-bold text-sky-700">{remainingMiqaats}</p>
-                      <p className="text-xs uppercase tracking-wide text-sky-700">
-                        Remaining
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-slate-200 bg-slate-50">
-                    <CardContent className="py-4 text-center">
-                      <p className="text-2xl font-bold text-slate-600">{noJamanMiqaats}</p>
-                      <p className="text-xs uppercase tracking-wide text-slate-500">
-                        No Jaman
-                      </p>
-                    </CardContent>
-                  </Card>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCalendarFilter("all");
+                      setTab("calendar");
+                    }}
+                    className="block"
+                  >
+                    <Card className="border-slate-200 bg-white transition hover:border-slate-400">
+                      <CardContent className="py-4 text-center">
+                        <p className="text-2xl font-bold">{miqaats.length}</p>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">
+                          Total miqaats
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </a>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCalendarFilter("taken");
+                      setTab("calendar");
+                    }}
+                    className="block"
+                  >
+                    <Card className="border-emerald-200 bg-emerald-50 transition hover:border-emerald-400">
+                      <CardContent className="py-4 text-center">
+                        <p className="text-2xl font-bold text-emerald-700">{takenMiqaats}</p>
+                        <p className="text-xs uppercase tracking-wide text-emerald-700">
+                          Taken
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </a>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCalendarFilter("open");
+                      setTab("calendar");
+                    }}
+                    className="block"
+                  >
+                    <Card className="border-sky-200 bg-sky-50 transition hover:border-sky-400">
+                      <CardContent className="py-4 text-center">
+                        <p className="text-2xl font-bold text-sky-700">{remainingMiqaats}</p>
+                        <p className="text-xs uppercase tracking-wide text-sky-700">
+                          Remaining
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </a>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCalendarFilter("no_jaman");
+                      setTab("calendar");
+                    }}
+                    className="block"
+                  >
+                    <Card className="border-slate-200 bg-slate-50 transition hover:border-slate-400">
+                      <CardContent className="py-4 text-center">
+                        <p className="text-2xl font-bold text-slate-600">{noJamanMiqaats}</p>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">
+                          No Jaman
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </a>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCalendarFilter("community_niyaz");
+                      setTab("calendar");
+                    }}
+                    className="block"
+                  >
+                    <Card className="border-indigo-200 bg-indigo-50 transition hover:border-indigo-400">
+                      <CardContent className="py-4 text-center">
+                        <p className="text-2xl font-bold text-indigo-700">
+                          {communityNiyazMiqaats}
+                        </p>
+                        <p className="text-xs uppercase tracking-wide text-indigo-700">
+                          Community
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </a>
                 </div>
 
                 <div>
                   <h3 className="mb-3 font-serif text-lg">Bookings by family</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {adminFamilies.map((f) => (
-                      <Card key={f.id} className="border-slate-200">
-                        <CardContent className="flex items-center justify-between py-4">
-                          <span className="font-medium">{f.name}</span>
-                          <Badge tone={bookingsByFamily[f.name] ? "taken" : "neutral"}>
-                            {bookingsByFamily[f.name] ?? 0} jaman
-                          </Badge>
-                        </CardContent>
-                      </Card>
+                      <a
+                        key={f.id}
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          // Clicking the selected family clears the filter; clicking another selects it.
+                          setCalendarFamily(calendarFamily === f.name ? null : f.name);
+                          setTab("calendar");
+                        }}
+                        className="block"
+                      >
+                        <Card
+                          className={cn(
+                            "border-slate-200 transition hover:border-amber-400",
+                            calendarFamily === f.name && "border-amber-400 ring-1 ring-amber-200"
+                          )}
+                        >
+                          <CardContent className="flex items-center justify-between py-4">
+                            <span className="font-medium">{f.name}</span>
+                            <Badge tone={bookingsByFamily[f.name] ? "taken" : "neutral"}>
+                              {bookingsByFamily[f.name] ?? 0} jaman
+                            </Badge>
+                          </CardContent>
+                        </Card>
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -624,31 +933,6 @@ export default function MiqaatApp() {
                     </div>
                   </div>
                 )}
-
-                <div>
-                  <h3 className="mb-3 font-serif text-lg">Full sponsor list</h3>
-                  <div className="space-y-2">
-                    {adminBookings
-                      .filter((b) => b.status !== "cancelled")
-                      .sort((a, b) =>
-                        a.miqaat.gregorian_date.localeCompare(b.miqaat.gregorian_date)
-                      )
-                      .map((b) => (
-                        <div
-                          key={b.id}
-                          className="flex items-center justify-between border-b border-slate-200 py-2 text-sm"
-                        >
-                          <span className="text-slate-700">
-                            {b.miqaat.hijri_day} — {b.miqaat.name}
-                          </span>
-                          <span className="font-medium">{b.family_name}</span>
-                        </div>
-                      ))}
-                    {adminBookings.length === 0 && (
-                      <p className="text-sm text-slate-500">No bookings yet.</p>
-                    )}
-                  </div>
-                </div>
 
                 <div className="border-t border-slate-200 pt-6">
                   <h3 className="mb-3 font-serif text-lg">Manage families</h3>
@@ -764,6 +1048,107 @@ export default function MiqaatApp() {
             </DialogFooter>
           </>
         )}
+      </Dialog>
+
+      {/* ---------------- ADD/EDIT MIQAAT DIALOG ---------------- */}
+      <Dialog open={miqaatDialogOpen} onOpenChange={(o) => !o && setMiqaatDialogOpen(false)}>
+        <form onSubmit={handleSaveMiqaat}>
+          <DialogHeader>
+            <DialogTitle>{editingMiqaat ? "Edit miqaat" : "Add miqaat"}</DialogTitle>
+            <DialogDescription>
+              {editingMiqaat
+                ? `Update the details for ${editingMiqaat.name}.`
+                : "Create a new miqaat — families can claim it right away."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Hijri month</label>
+                <Select value={miqaatMonth} onChange={(e) => setMiqaatMonth(e.target.value)}>
+                  {HIJRI_MONTHS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Hijri day</label>
+                <Input
+                  placeholder="e.g. 22mi tarekh"
+                  value={miqaatDay}
+                  onChange={(e) => setMiqaatDay(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Gregorian date</label>
+                <Input
+                  type="date"
+                  value={miqaatDate}
+                  onChange={(e) => setMiqaatDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Occasion name</label>
+                <Input
+                  placeholder="e.g. 16mi Darees"
+                  value={miqaatName}
+                  onChange={(e) => setMiqaatName(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Location (optional)</label>
+              <Input
+                placeholder="e.g. Madina"
+                value={miqaatLocation}
+                onChange={(e) => setMiqaatLocation(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Niyaz notes (optional)</label>
+              <Input
+                placeholder="e.g. Maula TUS Ashara"
+                value={miqaatNotes}
+                onChange={(e) => setMiqaatNotes(e.target.value)}
+              />
+            </div>
+            <label className="flex items-start gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={miqaatCommunityNiyaz}
+                onChange={(e) => setMiqaatCommunityNiyaz(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Community niyaz — jaman done by the whole community,{" "}
+                <span className="font-medium">not claimable by a family</span>
+              </span>
+            </label>
+            {miqaatError && <p className="text-sm text-red-600">{miqaatError}</p>}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMiqaatDialogOpen(false)}
+              disabled={savingMiqaat}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={savingMiqaat}>
+              {savingMiqaat
+                ? "Saving…"
+                : editingMiqaat
+                ? "Save changes"
+                : "Add miqaat"}
+            </Button>
+          </DialogFooter>
+        </form>
       </Dialog>
     </div>
   );
